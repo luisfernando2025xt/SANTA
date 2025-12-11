@@ -8,129 +8,120 @@
         background: #111;
         color: white;
         font-family: Arial, sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding-top: 40px;
-    }
-
-    h1 { margin-bottom: 10px; }
-
-    input {
-        padding: 10px 15px;
-        font-size: 18px;
-        border-radius: 8px;
-        border: none;
-        margin-bottom: 25px;
-        width: 260px;
-    }
-
-    /* --- Santa Silhouette --- */
-    .santa-container {
-        position: relative;
-        width: 250px;
-        height: 350px;
-        filter: drop-shadow(0 0 10px #000);
-    }
-
-    /* Head */
-    .head {
-        width: 120px;
-        height: 120px;
-        background: #000;
-        border-radius: 50%;
-        position: absolute;
-        top: 0;
-        left: 50px;
-    }
-
-    /* Hat */
-    .hat {
-        position: absolute;
-        top: -20px;
-        left: 40px;
-        width: 160px;
-        height: 90px;
-        background: #000;
-        border-radius: 50% 50% 0 0;
-        transform: rotate(-10deg);
-    }
-
-    /* Beard silhouette */
-    .beard {
-        position: absolute;
-        top: 70px;
-        left: 40px;
-        width: 170px;
-        height: 160px;
-        background: #000;
-        border-radius: 50% 50% 60% 60%;
-    }
-
-    /* Body */
-    .body {
-        position: absolute;
-        top: 180px;
-        left: 25px;
-        width: 200px;
-        height: 160px;
-        background: #000;
-        border-radius: 20px;
-    }
-
-    /* Arms */
-    .arm-left, .arm-right {
-        width: 60px;
-        height: 120px;
-        background: #000;
-        position: absolute;
-        top: 180px;
-        border-radius: 30px;
-    }
-
-    .arm-left  { left: -10px; transform: rotate(-10deg); }
-    .arm-right { right: -10px; transform: rotate(10deg); }
-
-    /* Letter */
-    .letter {
-        position: absolute;
-        top: 210px;
-        left: 55px;
-        width: 140px;
-        height: 90px;
-        background: white;
-        color: black;
-        border-radius: 6px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-weight: bold;
         text-align: center;
-        padding: 10px;
-        box-shadow: 0 0 15px rgba(255,255,255,0.7);
+        padding: 20px;
+    }
+    #result {
+        margin-top: 20px;
+    }
+    canvas {
+        border-radius: 20px;
+        box-shadow: 0 0 20px #ff000055;
     }
 </style>
 </head>
 <body>
 
-<h1>Your Santa Letter</h1>
-<input type="text" id="nameInput" placeholder="Write your name..." oninput="updateName()">
+<h1>🎅 Generate Your Santa Letter</h1>
 
-<div class="santa-container">
-    <div class="hat"></div>
-    <div class="head"></div>
-    <div class="beard"></div>
-    <div class="body"></div>
-    <div class="arm-left"></div>
-    <div class="arm-right"></div>
+<input id="nameInput" type="text" placeholder="Enter your name" 
+       style="padding:10px;font-size:20px;border-radius:10px;width:300px;">
+<br><br>
 
-    <div class="letter" id="letterName">Your Name</div>
-</div>
+<button onclick="generateImage()" 
+        style="padding:10px 20px;font-size:18px;border-radius:10px;">
+    Generate Image
+</button>
+
+<div id="result"></div>
 
 <script>
-function updateName() {
+function generateImage() {
     const name = document.getElementById("nameInput").value.trim();
-    document.getElementById("letterName").textContent = name || "Your Name";
+    if (!name) {
+        alert("Please enter a name first!");
+        return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 900;
+    canvas.height = 1200;
+    const ctx = canvas.getContext("2d");
+
+    // BACKGROUND
+    ctx.fillStyle = "#2a1a0f";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // GLOW BEHIND SANTA
+    ctx.beginPath();
+    const gradient = ctx.createRadialGradient(450, 400, 50, 450, 400, 500);
+    gradient.addColorStop(0, "rgba(255, 200, 150, 0.9)");
+    gradient.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = gradient;
+    ctx.arc(450, 400, 500, 0, Math.PI * 2);
+    ctx.fill();
+
+    // SANTA (stylized realistic painting)
+    ctx.fillStyle = "#b30000"; // suit
+    ctx.fillRect(250, 300, 400, 500);
+    ctx.fillStyle = "white"; // fur
+    ctx.fillRect(250, 300, 400, 40);
+
+    // Beard
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.ellipse(450, 450, 180, 140, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Face
+    ctx.fillStyle = "#f2d2b6";
+    ctx.beginPath();
+    ctx.ellipse(450, 370, 120, 90, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hat
+    ctx.fillStyle = "#b30000";
+    ctx.beginPath();
+    ctx.moveTo(330, 270);
+    ctx.quadraticCurveTo(450, 150, 600, 270);
+    ctx.fill();
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.ellipse(450, 270, 180, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Letter (glowing parchment)
+    ctx.fillStyle = "#f7e6b5";
+    ctx.shadowColor = "rgba(255,255,150,0.7)";
+    ctx.shadowBlur = 40;
+    ctx.fillRect(300, 550, 300, 200);
+
+    ctx.shadowBlur = 0;
+
+    // TEXT (name)
+    ctx.fillStyle = "#000";
+    ctx.font = "40px serif";
+    ctx.textAlign = "center";
+    ctx.fillText(name, 450, 660);
+
+    // DISPLAY RESULT
+    const img = new Image();
+    img.src = canvas.toDataURL("image/png");
+    img.style.width = "350px";
+    img.style.borderRadius = "20px";
+
+    const dl = document.createElement("a");
+    dl.href = img.src;
+    dl.download = "santa_letter.png";
+    dl.innerText = "Download Image";
+    dl.style.display = "block";
+    dl.style.marginTop = "10px";
+    dl.style.color = "white";
+
+    const result = document.getElementById("result");
+    result.innerHTML = "";
+    result.appendChild(img);
+    result.appendChild(dl);
 }
 </script>
 
