@@ -1,349 +1,138 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Santa Silhouette — Personalized</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<meta charset="UTF-8">
+<title>Santa Letter Generator</title>
 <style>
-  body{background:#071019;color:#f6f6f6;font-family:Inter,Arial,Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;padding:22px;}
-  .card{background:#08171b;padding:18px;border-radius:12px;max-width:960px;width:100%;}
-  h1{margin:0 0 8px;font-size:20px}
-  .controls{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap;}
-  input[type="text"]{padding:10px;border-radius:8px;border:1px solid #16323a;background:#0f2026;color:#fff;min-width:220px}
-  button{background:#e23b44;color:white;border:none;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:600}
-  button.ghost{background:transparent;border:1px solid #2b6a78;color:#bfe3ea}
-  #previewWrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
-  #preview{background:#062026;padding:12px;border-radius:10px}
-  #canvas{border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.6)}
-  .hint{color:#94b6bd;font-size:13px;margin-top:8px}
+    body {
+        background: #111;
+        color: white;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 40px;
+    }
+
+    h1 { margin-bottom: 10px; }
+
+    input {
+        padding: 10px 15px;
+        font-size: 18px;
+        border-radius: 8px;
+        border: none;
+        margin-bottom: 25px;
+        width: 260px;
+    }
+
+    /* --- Santa Silhouette --- */
+    .santa-container {
+        position: relative;
+        width: 250px;
+        height: 350px;
+        filter: drop-shadow(0 0 10px #000);
+    }
+
+    /* Head */
+    .head {
+        width: 120px;
+        height: 120px;
+        background: #000;
+        border-radius: 50%;
+        position: absolute;
+        top: 0;
+        left: 50px;
+    }
+
+    /* Hat */
+    .hat {
+        position: absolute;
+        top: -20px;
+        left: 40px;
+        width: 160px;
+        height: 90px;
+        background: #000;
+        border-radius: 50% 50% 0 0;
+        transform: rotate(-10deg);
+    }
+
+    /* Beard silhouette */
+    .beard {
+        position: absolute;
+        top: 70px;
+        left: 40px;
+        width: 170px;
+        height: 160px;
+        background: #000;
+        border-radius: 50% 50% 60% 60%;
+    }
+
+    /* Body */
+    .body {
+        position: absolute;
+        top: 180px;
+        left: 25px;
+        width: 200px;
+        height: 160px;
+        background: #000;
+        border-radius: 20px;
+    }
+
+    /* Arms */
+    .arm-left, .arm-right {
+        width: 60px;
+        height: 120px;
+        background: #000;
+        position: absolute;
+        top: 180px;
+        border-radius: 30px;
+    }
+
+    .arm-left  { left: -10px; transform: rotate(-10deg); }
+    .arm-right { right: -10px; transform: rotate(10deg); }
+
+    /* Letter */
+    .letter {
+        position: absolute;
+        top: 210px;
+        left: 55px;
+        width: 140px;
+        height: 90px;
+        background: white;
+        color: black;
+        border-radius: 6px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: bold;
+        text-align: center;
+        padding: 10px;
+        box-shadow: 0 0 15px rgba(255,255,255,0.7);
+    }
 </style>
 </head>
 <body>
-  <div class="card">
-    <h1>🎅 Santa Silhouette — Personalized (no images)</h1>
-    <div class="controls">
-      <input id="nameInput" placeholder="Recipient name (e.g. María)" type="text"/>
-      <input id="codeInput" placeholder="Optional code (e.g. ABC123)" type="text" style="width:160px"/>
-      <button id="genBtn">Generate</button>
-      <button id="downloadImgBtn" class="ghost" style="display:none">Download PNG</button>
-      <button id="downloadPdfBtn" class="ghost" style="display:none">Download PDF</button>
-    </div>
 
-    <div id="previewWrap">
-      <div id="preview">
-        <canvas id="canvas" width="900" height="1200"></canvas>
-      </div>
+<h1>Your Santa Letter</h1>
+<input type="text" id="nameInput" placeholder="Write your name..." oninput="updateName()">
 
-      <div style="flex:1;min-width:260px;">
-        <p class="hint">This version draws Santa as a stylized silhouette (hat, beard, coat) and a glowing parchment. The recipient name is drawn on the parchment. Works 100% client-side, no images.</p>
-        <p class="hint">If you want different styles (cartoon, realistic silhouette, outline), say which and I’ll add presets.</p>
-      </div>
-    </div>
-  </div>
+<div class="santa-container">
+    <div class="hat"></div>
+    <div class="head"></div>
+    <div class="beard"></div>
+    <div class="body"></div>
+    <div class="arm-left"></div>
+    <div class="arm-right"></div>
+
+    <div class="letter" id="letterName">Your Name</div>
+</div>
 
 <script>
-/*
- Canvas drawing of Santa silhouette + parchment + name.
- Exports PNG and PDF. All client-side, no external images.
-*/
-
-const CANVAS_W = 900;
-const CANVAS_H = 1200;
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-
-const genBtn = document.getElementById('genBtn');
-const downloadImgBtn = document.getElementById('downloadImgBtn');
-const downloadPdfBtn = document.getElementById('downloadPdfBtn');
-const nameInput = document.getElementById('nameInput');
-const codeInput = document.getElementById('codeInput');
-
-function clearCanvas(){
-  ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
-  // background vignette
-  const g = ctx.createLinearGradient(0,0,0,CANVAS_H);
-  g.addColorStop(0,'#071019');
-  g.addColorStop(1,'#061219');
-  ctx.fillStyle = g;
-  ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+function updateName() {
+    const name = document.getElementById("nameInput").value.trim();
+    document.getElementById("letterName").textContent = name || "Your Name";
 }
-
-// Draw a soft spotlight behind Santa
-function drawSpotlight(){
-  const gx = ctx.createRadialGradient(CANVAS_W/2, 380, 40, CANVAS_W/2, 380, 700);
-  gx.addColorStop(0, 'rgba(255,235,180,0.22)');
-  gx.addColorStop(0.35, 'rgba(255,200,80,0.06)');
-  gx.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = gx;
-  ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
-}
-
-// Draw stylized Santa silhouette (hat, head, beard, coat, hands)
-function drawSantaSilhouette(){
-  const centerX = CANVAS_W/2;
-  const topY = 150;
-
-  // Hat (silhouette with white trim)
-  ctx.save();
-  ctx.fillStyle = '#2d0505'; // deep red silhouette
-  ctx.beginPath();
-  ctx.moveTo(centerX-90, topY+60);
-  ctx.quadraticCurveTo(centerX-160, topY-30, centerX-38, topY-80);
-  ctx.quadraticCurveTo(centerX+30, topY-120, centerX+120, topY-40);
-  ctx.quadraticCurveTo(centerX+170, topY+10, centerX+60, topY+80);
-  ctx.closePath();
-  ctx.fill();
-
-  // Hat trim (white)
-  ctx.fillStyle = '#f7f7f7';
-  ctx.beginPath();
-  ctx.ellipse(centerX+20, topY+80, 110, 40, 0, 0, Math.PI*2);
-  ctx.fill();
-  ctx.restore();
-
-  // Head (silhouette)
-  ctx.fillStyle = '#2d0505';
-  ctx.beginPath();
-  ctx.ellipse(centerX, topY+170, 90, 95, 0, 0, Math.PI*2);
-  ctx.fill();
-
-  // Beard (white large)
-  ctx.fillStyle = '#fffdf8';
-  ctx.beginPath();
-  ctx.moveTo(centerX-110, topY+210);
-  ctx.quadraticCurveTo(centerX-180, topY+340, centerX-80, topY+420);
-  ctx.quadraticCurveTo(centerX-30, topY+540, centerX, topY+520);
-  ctx.quadraticCurveTo(centerX+40, topY+540, centerX+100, topY+420);
-  ctx.quadraticCurveTo(centerX+180, topY+340, centerX+110, topY+210);
-  ctx.closePath();
-  ctx.fill();
-
-  // Mustache
-  ctx.fillStyle = '#fffdf8';
-  ctx.beginPath();
-  ctx.ellipse(centerX, topY+200, 70, 40, 0, 0, Math.PI);
-  ctx.fill();
-
-  // Nose (small)
-  ctx.fillStyle = '#f1c0aa';
-  ctx.beginPath();
-  ctx.ellipse(centerX, topY+190, 12, 10, 0, 0, Math.PI*2);
-  ctx.fill();
-
-  // Body coat (silhouette)
-  ctx.fillStyle = '#2d0505';
-  ctx.beginPath();
-  ctx.moveTo(centerX-160, topY+300);
-  ctx.quadraticCurveTo(centerX-200, topY+640, centerX-40, topY+940);
-  ctx.lineTo(centerX+40, topY+940);
-  ctx.quadraticCurveTo(centerX+200, topY+640, centerX+160, topY+300);
-  ctx.closePath();
-  ctx.fill();
-
-  // Fur trim on coat bottom (white ellipse)
-  ctx.fillStyle = '#fffdf8';
-  ctx.beginPath();
-  ctx.ellipse(centerX, topY+900, 140, 40, 0, 0, Math.PI*2);
-  ctx.fill();
-
-  // Arms (holding parchment) - silhouette
-  ctx.fillStyle = '#2d0505';
-  // left arm
-  ctx.beginPath();
-  ctx.moveTo(centerX-160, topY+420);
-  ctx.quadraticCurveTo(centerX-260, topY+520, centerX-180, topY+620);
-  ctx.quadraticCurveTo(centerX-120, topY+540, centerX-100, topY+480);
-  ctx.closePath();
-  ctx.fill();
-  // right arm
-  ctx.beginPath();
-  ctx.moveTo(centerX+160, topY+420);
-  ctx.quadraticCurveTo(centerX+260, topY+520, centerX+180, topY+620);
-  ctx.quadraticCurveTo(centerX+120, topY+540, centerX+100, topY+480);
-  ctx.closePath();
-  ctx.fill();
-}
-
-// Draw parchment between hands, with glow, and write name on it
-function drawParchmentWithName(name, code){
-  const centerX = CANVAS_W/2;
-  const y = 600;
-  const w = 420;
-  const h = 300;
-
-  // golden glow behind parchment
-  const glow = ctx.createRadialGradient(centerX, y+h/2, 10, centerX, y+h/2, 360);
-  glow.addColorStop(0, 'rgba(255,240,180,0.9)');
-  glow.addColorStop(0.3, 'rgba(255,220,120,0.35)');
-  glow.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(centerX - w*0.9, y - 40, w*1.8, h+80);
-
-  // parchment rectangle
-  ctx.save();
-  ctx.beginPath();
-  const px = centerX - w/2;
-  const py = y - h/2;
-  roundRect(ctx, px, py, w, h, 20);
-  ctx.fillStyle = '#fffaf0';
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = 'rgba(200,160,80,0.9)';
-  ctx.stroke();
-  ctx.restore();
-
-  // subtle parchment texture: small strokes
-  ctx.save();
-  ctx.globalAlpha = 0.06;
-  ctx.strokeStyle = '#c9b388';
-  for(let i=0;i<40;i++){
-    const tx = px + Math.random()*w;
-    const ty = py + Math.random()*h;
-    ctx.beginPath();
-    ctx.moveTo(tx, ty);
-    ctx.lineTo(tx+ (Math.random()-0.5)*40, ty + (Math.random()-0.5)*10);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Draw name in calligraphic-like style (simulate by bold serif)
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  // big name
-  ctx.save();
-  ctx.shadowColor = 'rgba(255,215,60,0.9)';
-  ctx.shadowBlur = 24;
-  ctx.fillStyle = '#3a1f00';
-  ctx.font = `bold 56px Georgia, "Times New Roman", serif`;
-  ctx.fillText(name, centerX, py + h*0.42);
-  ctx.restore();
-
-  // code smaller below
-  if(code){
-    ctx.save();
-    ctx.font = `500 26px Georgia, "Times New Roman", serif`;
-    ctx.fillStyle = '#6b4a2a';
-    ctx.fillText(code, centerX, py + h*0.7);
-    ctx.restore();
-  }
-
-  // small sparkles near top-left of parchment
-  for(let i=0;i<8;i++){
-    drawTinyStar(px + 40 + Math.random()*w*0.2, py + 20 + Math.random()*h*0.2, 2 + Math.random()*2);
-  }
-}
-
-// rounded rectangle helper
-function roundRect(ctx, x, y, w, h, r){
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-
-// tiny star sparkle
-function drawTinyStar(cx, cy, rad){
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,245,200,0.95)';
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - rad);
-  for(let i=0;i<5;i++){
-    ctx.rotate(Math.PI / 5);
-    ctx.lineTo(cx, cy - (i%2===0 ? rad*1.6 : rad));
-  }
-  ctx.fill();
-  ctx.restore();
-}
-
-// small decorative footer text
-function drawFooter(){
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.font = '14px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('A special message from Santa • Generated locally', CANVAS_W/2, CANVAS_H - 28);
-  ctx.restore();
-}
-
-// main render flow
-function renderAll(name, code){
-  clearCanvas();
-  drawSpotlight();
-  drawSantaSilhouette();
-  drawParchmentWithName(name, code);
-  drawFooter();
-}
-
-// wire button
-genBtn.addEventListener('click', () => {
-  const nm = nameInput.value.trim();
-  const cd = codeInput.value.trim();
-  if(!nm){ alert('Please enter a name'); return; }
-  renderAll(nm, cd);
-  downloadImgBtn.style.display = 'inline-block';
-  downloadPdfBtn.style.display = 'inline-block';
-});
-
-// download PNG
-downloadImgBtn.addEventListener('click', () => {
-  const nm = nameInput.value.trim() || 'guest';
-  const link = document.createElement('a');
-  link.href = canvas.toDataURL('image/png');
-  link.download = `Santa_${nm.replace(/\s+/g,'_')}.png`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-});
-
-// download PDF (image top + letter below)
-downloadPdfBtn.addEventListener('click', async () => {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'pt', format:[612,792] }); // letter
-  const margin = 36;
-  const pageW = 612;
-  const maxImgW = pageW - margin*2;
-  const imgW = maxImgW;
-  const imgH = (CANVAS_H / CANVAS_W) * imgW;
-
-  const dataUrl = canvas.toDataURL('image/png');
-  doc.addImage(dataUrl, 'PNG', margin, 40, imgW, imgH);
-
-  // letter text under image
-  const startY = 40 + imgH + 18;
-  doc.setFont('Courier','normal');
-  doc.setFontSize(12);
-  const user = nameInput.value.trim();
-  const letterLines = [
-    `Dear ${user},`,
-    '',
-    'Ho ho ho, I’ve been watching you closely this year…',
-    'You have grown more than you realize.',
-    'Life tested you, shaped you, but never broke you.',
-    'And I wrote this letter for a reason…',
-    'Because something big is coming your way.',
-    'Remember, the universe is aligning for you.',
-    'Keep your heart open and your spirit strong.',
-    'Challenges were stepping stones, not obstacles.',
-    'A special gift is on its path to you.',
-    'Believe in yourself, magic finds those who do.',
-    'Your patience and effort will be rewarded soon.',
-    'This letter marks the beginning of something extraordinary.',
-    '',
-    'Your special gift awaits!'
-  ].join('\\n\\n');
-  const split = doc.splitTextToSize(letterLines, pageW - margin*2);
-  doc.text(split, margin, startY);
-  doc.save(`Santa_Letter_${user.replace(/\s+/g,'_')}.pdf`);
-});
-
-// initial sample
-renderAll('Luis Fernando','ABC123');
-
 </script>
+
 </body>
 </html>
