@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Santa Personalizado — Generate & Download</title>
+
+<!-- jsPDF (for PDF export) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+  body{background:#071019;color:#f6f6f6;font-family:Inter, "Helvetica Neue", Arial, sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;}
+  .card{background:#07161c;border-radius:12px;padding:18px;max-width:980px;width:100%;box-shadow:0 6px 30px rgba(0,0,0,.6);}
+  h1{margin:0 0 12px;font-size:20px}
+  p.small{color:#b9c2c8;margin:6px 0 18px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  input[type="text"]{padding:10px 12px;font-size:16px;border-radius:8px;border:1px solid #24323a;background:#0f2026;color:#fff;min-width:240px}
+  button{background:#e63946;color:white;border:none;padding:10px 14px;border-radius:8px;font-weight:600;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid #2b6a78;color:#bfe3ea}
+  #previewWrap{margin-top:16px;display:flex;gap:16px}
+  #preview{max-width:360px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.6);background:#000}
+  .controls{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .hint{font-size:13px;color:#9fb6bd;margin-top:10px}
+  footer{margin-top:18px;color:#7f9aa0;font-size:13px}
+  a.hidden{display:none}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>🎅 Carta de Santa — Imagen personalizada</h1>
+  <p class="small">Escribe el nombre del destinatario y genera una imagen premium con Santa sosteniendo la carta con ese nombre. Todo se hace en el navegador (gratis).</p>
+
+  <div class="row">
+    <input id="nameInput" type="text" placeholder="Nombre del destinatario (ej. María)" />
+    <input id="codeInput" type="text" placeholder="Código (opcional)" style="width:180px" />
+    <button id="genBtn">Generar imagen</button>
+    <button id="downloadImgBtn" class="ghost" style="display:none">Descargar imagen</button>
+    <button id="downloadPdfBtn" class="ghost" style="display:none">Descargar PDF</button>
+  </div>
+
+  <div class="hint">Asegúrate de haber subido <strong>santa_template.png</strong> al mismo folder que este HTML en tu repo.</div>
+
+  <div id="previewWrap">
+    <div id="preview" style="padding:8px;display:flex;flex-direction:column;align-items:center;">
+      <canvas id="santaCanvas" width="1200" height="1600" style="display:none"></canvas>
+      <img id="previewImg" src="" alt="Preview Santa" style="max-width:360px;display:none;border-radius:10px"/>
+      <div id="loading" style="color:#9fb6bd;margin-top:8px;display:none">Generando...</div>
+    </div>
+
+    <div style="flex:1;">
+      <h3 style="margin-top:0">Vista previa y opciones</h3>
+      <p class="small">Tras generar, puedes descargar la imagen final o generar un PDF que incluye la imagen y la carta personalizada (texto configurable).</p>
+
+      <div style="margin-top:8px;">
+        <label style="font-size:13px;color:#9fb6bd">Fuente del template:</label>
+        <div style="font-size:13px;color:#bfe3ea;margin-top:6px">santa_template.png (colócalo en el mismo folder)</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:12px;color:#9fb6bd">
+    <strong>Nota:</strong> si la posición del nombre no queda perfecta en tu plantilla, dime y ajusto las coordenadas exactas. Puedes usar mayúsculas, tildes y espacios.
+  </div>
+</div>
+
+<footer>Hecho para vender — listo para GitHub Pages. Si quieres efectos extra (glow, glitter, caligrafía) dime y lo afinamos.</footer>
+
+<script>
+/*
+  Full client-side generator.
+  - Uses a template image "santa_template.png" (place it in same folder)
+  - Draws the name (and optional code) onto the letter area using Canvas
+  - Shows preview, lets user download PNG or PDF (jsPDF)
+*/
+
+/* Coordinates & style:
+   These coordinates are set to work well with a typical "Santa holding a letter" template.
+   If your image needs the text slightly moved, change NAME_X, NAME_Y, or scale.
+*/
+const CANVAS_W = 1200;
+const CANVAS_H = 1600;
+const NAME_X = 760;   // x coordinate (adjust)
+const NAME_Y = 820;   // y coordinate (adjust)
+const CODE_X = 760;   // optional code below name
+const CODE_Y = 880;
+
+const NAME_FONT_SIZE = 80;
+const CODE_FONT_SIZE = 44;
+
+const templateSrc = 'santa_template.png'; // must exist in same folder
+
+const nameInput = document.getElementById('nameInput');
+const codeInput = document.getElementById('codeInput');
+const genBtn = document.getElementById('genBtn');
+const previewImg = document.getElementById('previewImg');
+const santaCanvas = document.getElementById('santaCanvas');
+const loadingEl = document.getElementById('loading');
+const downloadImgBtn = document.getElementById('downloadImgBtn');
+const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+
+const ctx = santaCanvas.getContext('2d');
+
+function showLoading(on){
+  loadingEl.style.display = on ? 'block' : 'none';
+}
+
+async function generateImageFor(name, code){
+  showLoading(true);
+  previewImg.style.display = 'none';
+  downloadImgBtn.style.display = 'none';
+  downloadPdfBtn.style.display = 'none';
+
+  // Clear canvas
+  ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+
+  // Load base image
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = templateSrc + '?v=' + Date.now(); // cache-bust while testing
+
+  await new Promise((res, rej) => {
+    img.onload = () => res();
+    img.onerror = (e) => rej(e);
+  }).catch(err => {
+    showLoading(false);
+    alert('No se pudo cargar santa_template.png. Revisa que exista en el mismo folder y la ruta.');
+    throw err;
+  });
+
+  // Draw base image scaled to canvas
+  // Keep aspect and fill canvas centered
+  const scale = Math.max(CANVAS_W / img.width, CANVAS_H / img.height);
+  const iw = img.width * scale;
+  const ih = img.height * scale;
+  const ix = (CANVAS_W - iw)/2;
+  const iy = (CANVAS_H - ih)/2;
+  ctx.drawImage(img, ix, iy, iw, ih);
+
+  // Create decorative vignette / soft darkening around corners (nice effect)
+  const g = ctx.createRadialGradient(CANVAS_W/2, CANVAS_H/2, CANVAS_W*0.2, CANVAS_W/2, CANVAS_H/2, CANVAS_W*0.9);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+
+  // Draw golden glow behind name to mimic magical parchment light
+  const name = name || '';
+  const code = code || '';
+
+  // Glow layer
+  ctx.save();
+  ctx.globalAlpha = 0.95;
+  ctx.fillStyle = 'rgba(255,230,150,0.08)';
+  ctx.beginPath();
+  ctx.ellipse(NAME_X, NAME_Y-20, 260, 100, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  // Text styling: large elegant script-like feel (use Georgia fallback)
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Shadow / outer glow for gold effect
+  ctx.shadowColor = 'rgba(255,215,60,0.95)';
+  ctx.shadowBlur = 40;
+
+  // Create gold gradient fill
+  const grad = ctx.createLinearGradient(0, NAME_Y - 80, 0, NAME_Y + 80);
+  grad.addColorStop(0, '#fff8e2');
+  grad.addColorStop(0.4, '#ffd95a');
+  grad.addColorStop(1, '#c68a06');
+
+  ctx.fillStyle = grad;
+  ctx.font = `700 ${NAME_FONT_SIZE}px Georgia, "Times New Roman", serif`;
+
+  // Stroke for readability
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+
+  // Draw name (stroke then fill)
+  ctx.strokeText(name, NAME_X, NAME_Y);
+  ctx.fillText(name, NAME_X, NAME_Y);
+
+  // Reset shadow for code
+  ctx.shadowBlur = 12;
+  ctx.font = `600 ${CODE_FONT_SIZE}px Georgia, "Times New Roman", serif`;
+  ctx.strokeText(code, CODE_X, CODE_Y);
+  ctx.fillText(code, CODE_X, CODE_Y);
+
+  // Optional small sparkles near top of letter
+  drawSparkles(NAME_X, NAME_Y - 120, 9);
+  drawSparkles(NAME_X + 140, NAME_Y - 80, 6);
+
+  // Done
+  const dataUrl = santaCanvas.toDataURL('image/png');
+  previewImg.src = dataUrl;
+  previewImg.style.display = 'block';
+  downloadImgBtn.style.display = 'inline-block';
+  downloadPdfBtn.style.display = 'inline-block';
+  showLoading(false);
+}
+
+// helper: small sparkles
+function drawSparkles(cx, cy, count){
+  for(let i=0;i<count;i++){
+    const x = cx + (Math.random()-0.5)*220;
+    const y = cy + (Math.random()-0.5)*120;
+    const r = 2 + Math.random()*4;
+    ctx.save();
+    ctx.fillStyle = `rgba(255, ${220 + Math.round(Math.random()*35)}, ${120 + Math.round(Math.random()*30)}, ${0.85*Math.random()+0.15})`;
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// wire events
+genBtn.addEventListener('click', () => {
+  const nm = nameInput.value.trim();
+  const cd = codeInput.value.trim();
+  if(!nm){ alert('Escribe primero el nombre del destinatario.'); return; }
+  generateImageFor(nm, cd);
+});
+
+downloadImgBtn.addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.href = previewImg.src;
+  link.download = `Santa_${(nameInput.value||'Guest').replace(/\s+/g,'_')}.png`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+});
+
+// PDF download (image at top + letter text below)
+downloadPdfBtn.addEventListener('click', () => {
+  (async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:'pt', format:[612,792] }); // letter size
+    // add image (scale to page width with margin)
+    const img = previewImg.src;
+    const margin = 36;
+    const pageW = 612;
+    const maxImgW = pageW - margin*2;
+    // approximate image aspect
+    const imgW = maxImgW;
+    const imgH = (santaCanvas.height / santaCanvas.width) * imgW;
+    doc.addImage(img, 'PNG', margin, 40, imgW, imgH);
+    // letter text
+    const startY = 40 + imgH + 20;
+    doc.setFont('Courier', 'normal');
+    doc.setFontSize(12);
+    // Build letter body (you can customize)
+    const user = nameInput.value.trim();
+    const letterBody = [
+      `Dear ${user},`,
+      '',
+      'Ho ho ho, I’ve been watching you closely this year…',
+      'You have grown more than you realize.',
+      'Life tested you, shaped you, but never broke you.',
+      'And I wrote this letter for a reason…',
+      'Because something big is coming your way.',
+      'Remember, the universe is aligning for you.',
+      'Keep your heart open and your spirit strong.',
+      'Challenges were stepping stones, not obstacles.',
+      'A special gift is on its path to you.',
+      'Believe in yourself, magic finds those who do.',
+      'Your patience and effort will be rewarded soon.',
+      'This letter marks the beginning of something extraordinary.',
+      '',
+      'Your special gift awaits!'
+    ].join('\\n\\n');
+    const split = doc.splitTextToSize(letterBody, pageW - margin*2);
+    doc.text(split, margin, startY);
+    doc.save(`Santa_Letter_${user.replace(/\s+/g,'_')}.pdf`);
+  })();
+});
+
+</script>
+</body>
+</html>
