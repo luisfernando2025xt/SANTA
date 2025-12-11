@@ -1,129 +1,392 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Santa Letter Generator</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Ultra-Realistic Santa — Personalized</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-    body {
-        background: #111;
-        color: white;
-        font-family: Arial, sans-serif;
-        text-align: center;
-        padding: 20px;
-    }
-    #result {
-        margin-top: 20px;
-    }
-    canvas {
-        border-radius: 20px;
-        box-shadow: 0 0 20px #ff000055;
-    }
+  :root{--bg:#08121a;--card:#0e2229;--accent:#ffc857}
+  body{margin:0;min-height:100vh;background:linear-gradient(180deg,#04060a 0%, #071321 60%);font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;color:#e6f7f7;display:flex;align-items:flex-start;justify-content:center;padding:28px}
+  .wrap{width:980px;max-width:98%;background:linear-gradient(180deg,#071923,#051018);border-radius:14px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+  h1{margin:0 0 8px;font-size:20px}
+  p.lead{color:#9fd0d6;margin:6px 0 18px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  input[type="text"]{padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);color:#fff;font-size:16px;min-width:240px}
+  button{background:linear-gradient(180deg,#ff6a3d,#d43d2e);color:white;border:0;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,.08);color:#bfe8ec;padding:8px 12px}
+  #preview{display:flex;gap:18px;margin-top:18px;align-items:flex-start}
+  #canvas{border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);background:#000}
+  .actions{display:flex;gap:8px;flex-direction:column;margin-left:12px}
+  .hint{color:#9fb6bd;font-size:13px;margin-top:10px}
+  footer{margin-top:12px;color:#7eaeb4;font-size:13px}
 </style>
 </head>
 <body>
+  <div class="wrap">
+    <h1>🎅 Ultra-Realistic Santa — Personalized</h1>
+    <p class="lead">Escribe el nombre y genera una imagen ultra-realista (render pintado en canvas). Descarga PNG o PDF con la carta y el nombre.</p>
 
-<h1>🎅 Generate Your Santa Letter</h1>
+    <div class="controls">
+      <input id="nameInput" type="text" placeholder="Nombre del destinatario (ej. María Álvarez)" />
+      <input id="codeInput" type="text" placeholder="Código (opcional)" style="width:160px"/>
+      <button id="genBtn">Generar Santa</button>
+      <button id="dlImgBtn" class="ghost" style="display:none">Descargar PNG</button>
+      <button id="dlPdfBtn" class="ghost" style="display:none">Descargar PDF</button>
+    </div>
 
-<input id="nameInput" type="text" placeholder="Enter your name" 
-       style="padding:10px;font-size:20px;border-radius:10px;width:300px;">
-<br><br>
+    <div id="preview">
+      <canvas id="canvas" width="1000" height="1400"></canvas>
+      <div class="actions">
+        <div style="max-width:260px">
+          <h3 style="margin:0 0 8px">Vista previa</h3>
+          <p class="hint">Se genera una ilustración pintada en el navegador con iluminación realista simulada y textura de papel. Ajusta el nombre y vuelve a generar para ver el resultado.</p>
+        </div>
+      </div>
+    </div>
 
-<button onclick="generateImage()" 
-        style="padding:10px 20px;font-size:18px;border-radius:10px;">
-    Generate Image
-</button>
-
-<div id="result"></div>
+    <div class="hint">Si quieres que el estilo sea aún más fotográfico dime “más cinematic”, “más mágico” o pásame un ejemplo real y lo igualo.</div>
+    <footer>Funciona 100% en el navegador — ideal para GitHub Pages.</footer>
+  </div>
 
 <script>
-function generateImage() {
-    const name = document.getElementById("nameInput").value.trim();
-    if (!name) {
-        alert("Please enter a name first!");
-        return;
-    }
+/* Ultra-realistic Santa renderer (canvas painter).
+   Techniques:
+   - layered gradients for depth
+   - many short hair strokes for beard realism
+   - micro-noise texture for skin and parchment
+   - radial light from parchment
+   - specular highlights and soft shadows
+*/
 
-    const canvas = document.createElement("canvas");
-    canvas.width = 900;
-    canvas.height = 1200;
-    const ctx = canvas.getContext("2d");
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { alpha: true });
+const W = canvas.width, H = canvas.height;
+const nameInput = document.getElementById('nameInput');
+const codeInput = document.getElementById('codeInput');
+const genBtn = document.getElementById('genBtn');
+const dlImgBtn = document.getElementById('dlImgBtn');
+const dlPdfBtn = document.getElementById('dlPdfBtn');
 
-    // BACKGROUND
-    ctx.fillStyle = "#2a1a0f";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // GLOW BEHIND SANTA
-    ctx.beginPath();
-    const gradient = ctx.createRadialGradient(450, 400, 50, 450, 400, 500);
-    gradient.addColorStop(0, "rgba(255, 200, 150, 0.9)");
-    gradient.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = gradient;
-    ctx.arc(450, 400, 500, 0, Math.PI * 2);
-    ctx.fill();
-
-    // SANTA (stylized realistic painting)
-    ctx.fillStyle = "#b30000"; // suit
-    ctx.fillRect(250, 300, 400, 500);
-    ctx.fillStyle = "white"; // fur
-    ctx.fillRect(250, 300, 400, 40);
-
-    // Beard
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-    ctx.ellipse(450, 450, 180, 140, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Face
-    ctx.fillStyle = "#f2d2b6";
-    ctx.beginPath();
-    ctx.ellipse(450, 370, 120, 90, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Hat
-    ctx.fillStyle = "#b30000";
-    ctx.beginPath();
-    ctx.moveTo(330, 270);
-    ctx.quadraticCurveTo(450, 150, 600, 270);
-    ctx.fill();
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-    ctx.ellipse(450, 270, 180, 30, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Letter (glowing parchment)
-    ctx.fillStyle = "#f7e6b5";
-    ctx.shadowColor = "rgba(255,255,150,0.7)";
-    ctx.shadowBlur = 40;
-    ctx.fillRect(300, 550, 300, 200);
-
-    ctx.shadowBlur = 0;
-
-    // TEXT (name)
-    ctx.fillStyle = "#000";
-    ctx.font = "40px serif";
-    ctx.textAlign = "center";
-    ctx.fillText(name, 450, 660);
-
-    // DISPLAY RESULT
-    const img = new Image();
-    img.src = canvas.toDataURL("image/png");
-    img.style.width = "350px";
-    img.style.borderRadius = "20px";
-
-    const dl = document.createElement("a");
-    dl.href = img.src;
-    dl.download = "santa_letter.png";
-    dl.innerText = "Download Image";
-    dl.style.display = "block";
-    dl.style.marginTop = "10px";
-    dl.style.color = "white";
-
-    const result = document.getElementById("result");
-    result.innerHTML = "";
-    result.appendChild(img);
-    result.appendChild(dl);
+function rand(min,max){ return min + Math.random()*(max-min); }
+function noise(ctx,alpha=0.04){
+  const imd = ctx.createImageData(W,H);
+  for(let i=0;i<imd.data.length;i+=4){
+    const v = (Math.random()*255)|0;
+    imd.data[i]=v; imd.data[i+1]=v; imd.data[i+2]=v; imd.data[i+3]= (alpha*255)|0;
+  }
+  ctx.putImageData(imd,0,0);
 }
-</script>
 
+// Painted background
+function drawBackground(){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#0b1114'); g.addColorStop(0.5,'#07121a'); g.addColorStop(1,'#04050a');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  // soft bokeh lights
+  for(let i=0;i<18;i++){
+    const x = rand(W*0.15,W*0.85), y = rand(H*0.02,H*0.35);
+    const r = rand(10,40);
+    const g2 = ctx.createRadialGradient(x,y,1,x,y,r);
+    g2.addColorStop(0, 'rgba(255,200,120,0.9)');
+    g2.addColorStop(1, 'rgba(255,200,120,0)');
+    ctx.fillStyle = g2; ctx.fillRect(x-r,y-r,r*2,r*2);
+  }
+}
+
+// soft vignette and atmosphere
+function drawAtmosphere(){
+  const g = ctx.createRadialGradient(W*0.5,H*0.35,10,W*0.5,H*0.35,W*1.1);
+  g.addColorStop(0, 'rgba(255,190,120,0.06)');
+  g.addColorStop(0.5, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+}
+
+// draw Santa robe block with depth
+function drawRobe(){
+  // base
+  const x = 220, y = 420, w = 560, h = 680;
+  const g = ctx.createLinearGradient(x,y,x,y+h);
+  g.addColorStop(0,'#8a0b0b'); g.addColorStop(1,'#4b0505');
+  ctx.fillStyle = g; roundRect(ctx,x,y,w,h,40); ctx.fill();
+
+  // fur trim
+  ctx.save();
+  ctx.fillStyle = '#fffaf6';
+  for(let i=0;i<6;i++){
+    roundRect(ctx,x+20,y + i*30, w-40, 28, 14); ctx.fill();
+  }
+  ctx.restore();
+
+  // subtle velvet texture
+  ctx.save();
+  ctx.globalAlpha = 0.06;
+  for(let i=0;i<200;i++){
+    ctx.fillStyle = `rgba(255,255,255,${rand(0.01,0.06)})`;
+    const tx = rand(x,x+w), ty = rand(y,y+h);
+    ctx.fillRect(tx,ty, rand(1,3), rand(6,18));
+  }
+  ctx.restore();
+}
+
+// face with shading (painterly)
+function drawFace(){
+  const cx = W/2, cy = 330;
+  // skin base
+  ctx.save();
+  const g = ctx.createRadialGradient(cx,cy-30,50,cx,cy+40,220);
+  g.addColorStop(0,'#ffdcbf'); g.addColorStop(1,'#d6a983');
+  ctx.fillStyle = g; ellipse(ctx,cx,cy,110,130); ctx.fill();
+
+  // nose highlight & shading
+  ctx.fillStyle = '#f2d2b6'; ellipse(ctx,cx,cy+10,34,26); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.beginPath(); ctx.ellipse(cx+26,cy+10,6,8,0,0,Math.PI*2); ctx.fill();
+
+  // cheeks
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = '#ff8a72'; ellipse(ctx,cx-46,cy+10,24,18); ellipse(ctx,cx+46,cy+12,24,18); ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // eyes (sparkle)
+  ctx.save();
+  ctx.fillStyle = '#2b1b13';
+  ctx.beginPath(); ctx.ellipse(cx-32,cy-6,10,7,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx+32,cy-6,10,7,0,0,Math.PI*2); ctx.fill();
+  // eye highlights
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(cx-36,cy-10,4,3); ctx.fillRect(cx+28,cy-10,4,3);
+  ctx.restore();
+}
+
+// beard: many short strokes for realism
+function drawBeard(){
+  const cx = W/2, cy = 410;
+  ctx.save();
+  // base shape
+  ctx.fillStyle = '#fffdf7';
+  ellipse(ctx,cx,cy+90,220,260);
+  ctx.fill();
+
+  // hair strokes
+  ctx.lineWidth = 1;
+  for(let i=0;i<2200;i++){
+    const angle = rand(-1.8,1.8);
+    const r = rand(20,260);
+    const x = cx + Math.cos(angle)*r*0.6 + rand(-8,8);
+    const y = cy + Math.sin(angle)*r*0.8 + rand(-6,6);
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(250,250,245,${rand(0.05,0.35)})`;
+    ctx.moveTo(x + rand(-3,3), y + rand(-3,3));
+    ctx.lineTo(x + rand(-10,10), y + rand(6,12));
+    ctx.stroke();
+  }
+
+  // soft shadow under beard
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  ellipse(ctx,cx,cy+140,140,40); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+}
+
+// hat + trim + pom
+function drawHat(){
+  const cx = W/2, cy = 240;
+  // hat body
+  ctx.save();
+  const g = ctx.createLinearGradient(cx-220,cy-80,cx+220,cy+40);
+  g.addColorStop(0,'#b71f1f'); g.addColorStop(1,'#6e0505');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(cx-180, cy-10);
+  ctx.quadraticCurveTo(cx-40, cy-180, cx+180, cy-30);
+  ctx.lineTo(cx+120, cy+40);
+  ctx.quadraticCurveTo(cx, cy-40, cx-180, cy-10);
+  ctx.closePath(); ctx.fill();
+
+  // white trim
+  ctx.fillStyle = '#fffdf7';
+  ellipse(ctx, cx-10, cy+44, 220, 48); ctx.fill();
+
+  // pom pom
+  ctx.fillStyle = '#fffdf7';
+  ellipse(ctx, cx+190, cy-8, 34, 34); ctx.fill();
+  ctx.restore();
+}
+
+// parchment with glow (centered) and name
+function drawParchment(name, code){
+  const px = W/2 - 210, py = 760, pw = 420, ph = 280;
+  // glow
+  const rg = ctx.createRadialGradient(W/2, py+ph/2, 10, W/2, py+ph/2, 520);
+  rg.addColorStop(0, 'rgba(255,230,140,0.95)');
+  rg.addColorStop(0.25, 'rgba(255,205,80,0.25)');
+  rg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = rg; ctx.fillRect(px-40,py-40,pw+80,ph+80);
+
+  // parchment base
+  roundRect(ctx,px,py,pw,ph,18);
+  ctx.fillStyle = '#f9f1e0'; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(190,140,50,0.85)'; ctx.stroke();
+
+  // texture
+  ctx.save(); ctx.globalAlpha=0.06;
+  for(let i=0;i<120;i++){
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(150,120,80,${Math.random()*0.15})`;
+    const tx = px + Math.random()*pw, ty=py + Math.random()*ph;
+    ctx.moveTo(tx,ty); ctx.lineTo(tx+rand(-18,18), ty+rand(-6,6)); ctx.stroke();
+  }
+  ctx.restore();
+
+  // name: simulate elegant calligraphy with shadow & slight warp
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#2b1400';
+  ctx.font = '800 56px "Georgia", serif';
+  // slight skew for realism: draw text in several offsets with low alpha to simulate ink spread
+  for(let i=0;i<4;i++){
+    ctx.globalAlpha = 0.14;
+    ctx.fillText(name, W/2 + rand(-2,2), py + ph*0.45 + i*0.6);
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#1b0f00';
+  ctx.fillText(name, W/2, py + ph*0.45);
+
+  // code below
+  if(code){
+    ctx.font = '500 22px Georgia, serif'; ctx.fillStyle = '#55331a';
+    ctx.fillText(code, W/2, py + ph*0.75);
+  }
+  ctx.restore();
+
+  // subtle sparkles along top-right
+  for(let s=0;s<7;s++){ drawSpark(W/2 + pw*0.25 + rand(-40,100), py + rand(10,80), rand(1.5,3.5)); }
+}
+
+// tiny sparkle
+function drawSpark(x,y,r){
+  ctx.save();
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(255,244,208,0.95)';
+  ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// helpers: ellipse & rounded rect
+function ellipse(ctx,x,y,rx,ry){
+  ctx.beginPath();
+  ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+// small vignette overlay
+function overlayVignette(){
+  const g = ctx.createRadialGradient(W/2,H/2,10,W/2,H/2,Math.max(W,H));
+  g.addColorStop(0,'rgba(0,0,0,0)');
+  g.addColorStop(1,'rgba(0,0,0,0.38)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+}
+
+// painterly specular highlights on coat and glove area
+function drawSpecular(){
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const g = ctx.createLinearGradient(W*0.3,0,W*0.75,0);
+  g.addColorStop(0,'rgba(255,200,170,0.06)'); g.addColorStop(1,'rgba(255,255,255,0.02)');
+  ctx.fillStyle = g; ctx.fillRect(W*0.3,520,W*0.45,520);
+  ctx.restore();
+}
+
+// main render orchestrator
+function render(name, code){
+  ctx.clearRect(0,0,W,H);
+  drawBackground();
+  drawAtmosphere();
+  drawRobe();
+  drawHat();
+  drawFace();
+  drawBeard();
+  drawSpecular();
+  drawParchment(name, code);
+  overlayVignette();
+  noise(ctx,0.02);
+}
+
+// spark helper
+function drawSparklesAround(x,y,count){
+  for(let i=0;i<count;i++){ drawSpark(x+rand(-40,40),y+rand(-30,30),rand(1,3)); }
+}
+
+// event wiring
+genBtn.addEventListener('click', () => {
+  const name = nameInput.value.trim();
+  const code = codeInput.value.trim();
+  if(!name){ alert('Escribe primero el nombre'); return; }
+  // draw high-detail (may take ~100-400ms)
+  render(name, code);
+  dlImgBtn.style.display = 'inline-block';
+  dlPdfBtn.style.display = 'inline-block';
+});
+
+// download image
+dlImgBtn.addEventListener('click', () => {
+  const name = nameInput.value.trim()||'guest';
+  const link = document.createElement('a');
+  link.href = canvas.toDataURL('image/png');
+  link.download = `Santa_${name.replace(/\s+/g,'_')}.png`;
+  document.body.appendChild(link); link.click(); link.remove();
+});
+
+// download PDF with image + letter text
+dlPdfBtn.addEventListener('click', async () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:[612,792] });
+  const margin = 36;
+  const pageW = 612;
+  const maxImgW = pageW - margin*2;
+  const dataUrl = canvas.toDataURL('image/png');
+  // scale image to width
+  const imgW = maxImgW;
+  const imgH = (H / W) * imgW;
+  doc.addImage(dataUrl,'PNG',margin,40,imgW,imgH);
+  // letter body
+  const user = nameInput.value.trim();
+  doc.setFont('Courier','normal'); doc.setFontSize(12);
+  const body = [
+    `Dear ${user},`,
+    '',
+    'Ho ho ho, I’ve been watching you closely this year…',
+    'You have grown more than you realize.',
+    'Life tested you, shaped you, but never broke you.',
+    'And I wrote this letter for a reason…',
+    'Because something big is coming your way.',
+    'Remember, the universe is aligning for you.',
+    'Keep your heart open and your spirit strong.',
+    'Challenges were stepping stones, not obstacles.',
+    'A special gift is on its path to you.',
+    'Believe in yourself, magic finds those who do.',
+    'Your patience and effort will be rewarded soon.',
+    'This letter marks the beginning of something extraordinary.',
+    '',
+    'Your special gift awaits!'
+  ].join('\\n\\n');
+  const lines = doc.splitTextToSize(body, pageW - margin*2);
+  doc.text(lines, margin, 60 + imgH);
+  doc.save(`Santa_Letter_${user.replace(/\s+/g,'_')}.pdf`);
+});
+
+// initial render for preview
+render('Luis Fernando','ABC123');
+</script>
 </body>
 </html>
